@@ -21,22 +21,27 @@ type Client struct {
 }
 
 // NewClient returns a new PowerDNS client
-func NewClient(serverUrl string, apiKey string) (*Client, error) {
+func NewClient(serverUrl string, apiKey string) *Client {
 	client := Client{
 		ServerUrl: serverUrl,
 		ApiKey:    apiKey,
 		Http:      cleanhttp.DefaultClient(),
 	}
-	var err error
-	client.ApiVersion, err = client.detectApiVersion()
-	if err != nil {
-		return nil, err
-	}
-	return &client, nil
+	client.ApiVersion = -1 // Not yet established.
+	return &client
 }
 
 // Creates a new request with necessary headers
 func (c *Client) newRequest(method string, endpoint string, body []byte) (*http.Request, error) {
+	if c.ApiVersion == -1 {
+		return c.newRequestInternal(method, endpoint, body, 0)
+	} else {
+		return c.newRequestInternal(method, endpoint, body, c.ApiVersion)
+	}
+
+}
+
+func (c *Client) newRequestInternal(method string, endpoint string, body []byte, version int) (*http.Request, error) {
 
 	var urlStr string
 	if c.ApiVersion > 0 {
@@ -127,7 +132,7 @@ func parseId(recId string) (string, string, error) {
 // Detects the API version in use on the server
 // Uses int to represent the API version: 0 is the legacy AKA version 3.4 API
 // Any other integer correlates with the same API version
-func (client *Client) detectApiVersion() (int, error) {
+func (client *Client) detectApiVersion(*http.Request) (int, error) {
 	req, err := client.newRequest("GET", "/api/v1/servers", nil)
 	if err != nil {
 		return -1, err

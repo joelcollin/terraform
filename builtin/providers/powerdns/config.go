@@ -1,9 +1,6 @@
 package powerdns
 
-import (
-	"fmt"
-	"log"
-)
+import "log"
 
 type Config struct {
 	ServerUrl string
@@ -12,11 +9,7 @@ type Config struct {
 
 // Client returns a new client for accessing PowerDNS
 func (c *Config) Client() (*Client, error) {
-	client, err := NewClient(c.ServerUrl, c.ApiKey)
-
-	if err != nil {
-		return nil, fmt.Errorf("Error setting up PowerDNS client: %s", err)
-	}
+	client := NewClient(c.ServerUrl, c.ApiKey)
 
 	log.Printf("[INFO] PowerDNS Client configured for server %s", c.ServerUrl)
 
