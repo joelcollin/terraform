@@ -36,5 +36,5 @@ func providerConfigure(data *schema.ResourceData) (interface{}, error) {
 		ServerUrl: data.Get("server_url").(string),
 	}
 
-	return config.Client()
+	return config.Client(), nil
 }

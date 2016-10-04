@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -21,22 +22,31 @@ type Client struct {
 }
 
 // NewClient returns a new PowerDNS client
-func NewClient(serverUrl string, apiKey string) (*Client, error) {
-	client := Client{
-		ServerUrl: serverUrl,
-		ApiKey:    apiKey,
-		Http:      cleanhttp.DefaultClient(),
+func NewClient(serverUrl string, apiKey string) *Client {
+	return &Client{
+		ServerUrl:  serverUrl,
+		ApiKey:     apiKey,
+		ApiVersion: -1, // Not yet determined, will be done at first request.
+		Http:       cleanhttp.DefaultClient(),
 	}
+}
+
+func (c *Client) newRequest(method string, endpoint string, body []byte) (*http.Request, error) {
 	var err error
-	client.ApiVersion, err = client.detectApiVersion()
-	if err != nil {
-		return nil, err
+	if c.ApiVersion == -1 { // API version is not yet initialized
+		log.Printf("[INFO] Detecting PowerDNS API Version")
+		c.ApiVersion, err = c.detectApiVersion()
+		if err != nil {
+			return nil, fmt.Errorf("Error setting up PowerDNS client: %s", err)
+		} else {
+			log.Printf("[INFO] PowerDNS API v%s", c.ApiVersion)
+		}
 	}
-	return &client, nil
+	return c.newRequestInternal(method, endpoint, body, c.ApiVersion)
 }
 
 // Creates a new request with necessary headers
-func (c *Client) newRequest(method string, endpoint string, body []byte) (*http.Request, error) {
+func (c *Client) newRequestInternal(method string, endpoint string, body []byte, version int) (*http.Request, error) {
 
 	var urlStr string
 	if c.ApiVersion > 0 {
@@ -128,7 +138,7 @@ func parseId(recId string) (string, string, error) {
 // Uses int to represent the API version: 0 is the legacy AKA version 3.4 API
 // Any other integer correlates with the same API version
 func (client *Client) detectApiVersion() (int, error) {
-	req, err := client.newRequest("GET", "/api/v1/servers", nil)
+	req, err := client.newRequestInternal("GET", "/api/v1/servers", nil, 0)
 	if err != nil {
 		return -1, err
 	}
@@ -136,6 +146,9 @@ func (client *Client) detectApiVersion() (int, error) {
 	if err != nil {
 		return -1, err
 	}
+
+	log.Printf("[INFO] PowerDNS Client configured for server %s", client.ServerUrl)
+
 	defer resp.Body.Close()
 	if resp.StatusCode == 200 {
 		return 1, nil
